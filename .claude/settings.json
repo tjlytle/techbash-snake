@@ -1,13 +1,22 @@
 {
   "plansDirectory": "./.claude/plans",
   "enabledPlugins": {
-    "dev-flow@dev-flow": true
+    "gh-personas@dev-flow": true,
+    "superpowers@claude-plugins-official": true,
+    "build@initialcommit": true,
+    "but-for-real@initialcommit": true
   },
   "extraKnownMarketplaces": {
     "dev-flow": {
       "source": {
         "source": "github",
         "repo": "tjlytle/dev-flow"
+      }
+    },
+    "initialcommit": {
+      "source": {
+        "source": "github",
+        "repo": "tjlytle/initialcommit-skills"
       }
     }
   },
