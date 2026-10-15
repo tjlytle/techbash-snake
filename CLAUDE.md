@@ -68,6 +68,23 @@ of looping. Logs are in `var/pipeline/`, `bin/pipeline --status` shows what is r
 Headless sessions run with the allow list in `bin/pipeline`; a denied tool call shows in the
 log as the reason a stage stopped.
 
+## The analyst
+
+Every game is event-sourced, so the snake's history is on disk. `bin/games` (run as
+`make games ARGS="…"`, inside the PHP container) replays it: `list`, `game <id>`,
+`turn <id> <n>` (the board as the specs draw it, our move, what it led to), `last <id>`,
+`scenario <id> <n> [move]` (a Behat scenario to paste into an issue). `bin/analyze` runs
+`pipeline/analyze.md` as ops: it reads the games since the last run and files one `idea`
+issue per lesson, each carrying the board situation as a scenario, which is exactly what the
+build stage needs as acceptance criteria. Run it after a game on stage; the systemd timer runs
+it hourly.
+
+## Keeping it running
+
+`bin/install-services` installs user systemd units from `deploy/systemd/`: the pipeline loop
+(restarts if it dies) and the hourly analyst timer. `loginctl enable-linger` keeps them up
+after logout. `bin/install-services remove` takes them out.
+
 ## GitHub Workflow
 
 Bots: advocate=advocate, architect=architect, builder=builder, qa=qa, reviewer=reviewer, ops=ops

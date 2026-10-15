@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# bin/analyze — the analyst: read recent games from the event store, file `idea` issues.
+#
+#   bin/analyze            one run (what the systemd timer calls hourly; run it after a game on stage)
+#
+# Runs pipeline/analyze.md as the ops persona in a headless Claude Code session. The game
+# history comes from the project's own CLI, `make games ARGS="…"` (bin/games, run in the
+# PHP container over var/snake.db). Log: var/pipeline/analyze.log
+set -u
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+MODEL=${PIPELINE_MODEL:-opus}
+LOG="$ROOT/var/pipeline"
+mkdir -p "$LOG"
+
+ALLOW=(
+  "Read" "Glob" "Grep" "Write" "TodoWrite"
+  "Bash(make games *)" "Bash(docker compose run *)"
+  "Bash(gh-as *)" "Bash(gh-personas *)" "Bash(gh *)" "Bash(git log *)" "Bash(git show *)"
+  "Bash(ls *)" "Bash(cat *)" "Bash(head *)" "Bash(tail *)" "Bash(grep *)" "Bash(jq *)"
+  "Bash(mkdir *)" "Bash(echo *)" "Bash(date *)" "Bash(wc *)"
+)
+
+printf '%s analyst run (%s)\n' "$(date +%H:%M:%S)" "$MODEL" | tee -a "$LOG/analyze.log"
+cd "$ROOT" && claude -p "$(cat "$ROOT/pipeline/analyze.md")" \
+  --model "$MODEL" --permission-mode acceptEdits --allowedTools "${ALLOW[@]}" \
+  --output-format text 2>&1 | sed -u 's/^/  analyst │ /' | tee -a "$LOG/analyze.log"
+printf '%s analyst done\n' "$(date +%H:%M:%S)" | tee -a "$LOG/analyze.log"
