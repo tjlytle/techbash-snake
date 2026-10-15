@@ -2,11 +2,12 @@
 # bin/pipeline — the agent pipeline for the talk.
 #
 #   bin/pipeline            watch open issues forever; run each stage's prompt as it is due
-#   bin/pipeline --once     one pass over the open issues, then exit
-#   bin/pipeline <#>        run the due stage for one issue now (foreground)
+#   bin/pipeline --once     one pass over the open issues, then exit (runs keep going)
+#   bin/pipeline <#>        run the due stage for one issue now, in the foreground
+#   bin/pipeline --status   what is running, what is waiting, what failed
 #
-# Stages are labels. The loop decides nothing; it maps a label to a prompt file and
-# runs that prompt in a headless Claude Code session for the issue:
+# Stages are labels. The loop decides nothing about the work; it maps a label to a
+# prompt file and runs that prompt in a headless Claude Code session for the issue:
 #
 #   stage:todo          backlog, untouched
 #   stage:in-progress   pipeline/build.md   (builder: worktree, test, code, draft PR)
@@ -16,16 +17,27 @@
 #   stage:parked        waiting on a human; picked up again when the newest comment is
 #                       from a human, and then handed back to the build prompt
 #
+# `working` is the loop's own label: it is on an issue while a session has it, and comes
+# off when that session ends. The stage label says where the issue is; `working` says
+# someone has it right now. Each run also has a marker directory, var/pipeline/run-<#>/,
+# holding the session's pid, the stage it started from, and the log.
+#
+# The loop tracks its sessions. When one ends and the stage label has not moved, the
+# session is taken to have failed: `working` comes off, the issue stays where it was,
+# and the next pass tries again. After MAX_TRIES ends without a move, the issue parks
+# with the log tail and @tjlytle, so a stage that keeps dying does not loop forever.
+# A `working` label with no live session on this machine is stale and is cleared.
+#
 # The headless session gets the tool allow list below and nothing more: file edits are
 # accepted, and only the listed commands run. A command outside the list is denied and
 # the stage stops with that denial in its log, which is the signal to widen the list.
-#
-# Logs: var/pipeline/<#>.log ; a run marker: var/pipeline/running-<#>/
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 REPO=${PIPELINE_REPO:-tjlytle/techbash-snake}
 INTERVAL=${PIPELINE_INTERVAL:-30}
 MODEL=${PIPELINE_MODEL:-opus}
+MAX_TRIES=${PIPELINE_MAX_TRIES:-3}
+HUMAN=${PIPELINE_HUMAN:-tjlytle}
 LOG="$ROOT/var/pipeline"
 mkdir -p "$LOG"
 
@@ -40,12 +52,16 @@ ALLOW=(
 
 say() { printf '%s %s\n' "$(date +%H:%M:%S)" "$*"; }
 
-prompt_for() {   # prompt_for <labels-csv> → prompt file name, or empty when nothing is due
-  case ",$1," in
-    *,stage:in-progress,*) echo build ;;
-    *,stage:review,*)      echo review ;;
-    *,stage:qa,*)          echo qa ;;
-    *)                     echo "" ;;
+labels_of() { gh issue view "$1" -R "$REPO" --json labels --jq '[.labels[].name] | join(",")'; }
+stage_of()  { tr ',' '\n' <<<"$1" | grep '^stage:' | head -1; }
+label()     { gh-as - issue edit "$1" -R "$REPO" "$2" "$3" >/dev/null 2>&1; }   # label <#> --add-label|--remove-label <name>
+
+prompt_for() {   # prompt_for <stage> → prompt file name, or empty when nothing is due
+  case "$1" in
+    stage:in-progress) echo build ;;
+    stage:review)      echo review ;;
+    stage:qa)          echo qa ;;
+    *)                 echo "" ;;
   esac
 }
 
@@ -56,47 +72,107 @@ answered() {   # answered <#>: a parked issue whose newest comment is from a hum
   [[ "$last" == *" User" ]]
 }
 
-run_stage() {   # run_stage <#> <title> <prompt>  — foreground, logs to var/pipeline/<#>.log
-  local n=$1 title=$2 stage=$3 mark="$LOG/running-$1"
-  mkdir "$mark" 2>/dev/null || { say "#$n already running"; return 0; }
-  say "#$n  $title  → $stage ($MODEL)" | tee -a "$LOG/$n.log"
-  ( cd "$ROOT" && claude -p "$(sed "s/{N}/$n/g" "$ROOT/pipeline/$stage.md")" \
-      --model "$MODEL" --permission-mode acceptEdits --allowedTools "${ALLOW[@]}" \
-      --output-format text 2>&1 | sed -u "s/^/  #$n │ /" | tee -a "$LOG/$n.log" )
-  say "#$n  $stage finished" | tee -a "$LOG/$n.log"
-  rmdir "$mark"
+alive() { [ -f "$1/pid" ] && kill -0 "$(cat "$1/pid")" 2>/dev/null; }
+
+finish() {   # finish <#>: the session for <#> has ended; free the issue, judge the outcome
+  local n=$1 mark="$LOG/run-$1" before after tries
+  [ -d "$mark" ] || return 0
+  before=$(cat "$mark/stage" 2>/dev/null)
+  after=$(stage_of "$(labels_of "$n")")
+  label "$n" --remove-label working
+  if [ "$after" != "$before" ]; then
+    say "#$n  $before → ${after:-no stage}"
+    rm -f "$LOG/$n.tries"
+  else
+    tries=$(( $(cat "$LOG/$n.tries" 2>/dev/null || echo 0) + 1 ))
+    echo "$tries" > "$LOG/$n.tries"
+    if [ "$tries" -ge "$MAX_TRIES" ]; then
+      say "#$n  ended without moving $tries times; parking it"
+      gh-as ops issue comment "$n" -R "$REPO" --body "$(printf '%s\n\n```\n%s\n```' \
+        "Pipeline: the $before stage ended $tries times without moving this issue, so I am parking it. @$HUMAN, the log tail:" \
+        "$(tail -n 20 "$LOG/$n.log" 2>/dev/null)")" >/dev/null 2>&1
+      label "$n" --remove-label "$before"
+      label "$n" --add-label stage:parked
+      rm -f "$LOG/$n.tries"
+    else
+      say "#$n  ended without moving ($tries/$MAX_TRIES); it stays in $before and will be retried"
+    fi
+  fi
+  rm -rf "$mark"
 }
 
-due() {   # due <#> <labels-csv> → stage to run, or empty
-  local n=$1 labels=$2 stage
-  stage=$(prompt_for "$labels")
-  if [ -z "$stage" ] && [[ ",$labels," == *,stage:parked,* ]] && answered "$n"; then
-    gh-as - issue edit "$n" -R "$REPO" --remove-label stage:parked --add-label stage:in-progress >/dev/null 2>&1
-    stage=build
+run_stage() {   # run_stage <#> <title> <stage-label> <prompt>: start a session in the background
+  local n=$1 title=$2 stage=$3 prompt=$4 mark="$LOG/run-$1"
+  mkdir "$mark" 2>/dev/null || { say "#$n already running"; return 0; }
+  echo "$stage" > "$mark/stage"
+  label "$n" --add-label working
+  say "#$n  $title  → $prompt ($MODEL)" | tee -a "$LOG/$n.log"
+  (
+    cd "$ROOT" && claude -p "$(sed "s/{N}/$n/g" "$ROOT/pipeline/$prompt.md")" \
+      --model "$MODEL" --permission-mode acceptEdits --allowedTools "${ALLOW[@]}" \
+      --output-format text 2>&1 | sed -u "s/^/  #$n │ /" | tee -a "$LOG/$n.log"
+    say "#$n  $prompt session ended" | tee -a "$LOG/$n.log"
+    finish "$n"
+  ) &
+  echo $! > "$mark/pid"
+}
+
+reap() {   # sessions that died without running their own finish (loop restarted, kill -9)
+  local mark n
+  for mark in "$LOG"/run-*; do
+    [ -d "$mark" ] || continue
+    n=${mark##*/run-}
+    alive "$mark" || { say "#$n  session gone; cleaning up"; finish "$n"; }
+  done
+}
+
+due() {   # due <#> <labels-csv> → prompt to run, or empty
+  local n=$1 labels=$2 stage prompt
+  stage=$(stage_of "$labels")
+  prompt=$(prompt_for "$stage")
+  if [ -z "$prompt" ] && [ "$stage" = stage:parked ] && answered "$n"; then
+    label "$n" --remove-label stage:parked; label "$n" --add-label stage:in-progress
+    stage=stage:in-progress; prompt=build
   fi
-  echo "$stage"
+  echo "$stage $prompt"
 }
 
 pass() {   # one sweep over the open issues
+  reap
   while IFS=$'\t' read -r n title labels; do
     [ -z "$n" ] && continue
-    if [ -d "$LOG/running-$n" ]; then say "#$n  $title  (running)"; continue; fi
-    stage=$(due "$n" "$labels")
-    if [ -n "$stage" ]; then run_stage "$n" "$title" "$stage" &
-    else say "#$n  $title  [${labels:-no stage}]"; fi
+    if [ -d "$LOG/run-$n" ]; then say "#$n  $title  (running)"; continue; fi
+    if [[ ",$labels," == *,working,* ]]; then say "#$n  stale working label; clearing"; label "$n" --remove-label working; fi
+    read -r stage prompt <<<"$(due "$n" "$labels")"
+    if [ -n "${prompt:-}" ]; then run_stage "$n" "$title" "$stage" "$prompt"
+    else say "#$n  $title  [${stage:-no stage}]"; fi
   done < <(gh issue list -R "$REPO" --state open --limit 50 \
              --json number,title,labels \
              --jq '.[] | [.number, .title, ([.labels[].name] | join(","))] | @tsv')
-  wait
+}
+
+status() {
+  reap
+  local mark n
+  for mark in "$LOG"/run-*; do
+    [ -d "$mark" ] || continue
+    n=${mark##*/run-}
+    say "#$n  running $(cat "$mark/stage") since $(date -r "$mark/stage" +%H:%M:%S), pid $(cat "$mark/pid")"
+  done
+  for t in "$LOG"/*.tries; do [ -f "$t" ] && say "#$(basename "$t" .tries)  $(cat "$t") failed run(s), waiting for a retry"; done
+  gh issue list -R "$REPO" --state open --limit 50 --json number,title,labels \
+    --jq '.[] | "  #\(.number)  \(.title)  [\([.labels[].name] | join(", "))]"'
 }
 
 case "${1:-}" in
-  "")      say "watching $REPO every ${INTERVAL}s (ctrl-c to stop)"
-           while true; do pass; sleep "$INTERVAL"; done ;;
-  --once)  pass ;;
-  [0-9]*)  labels=$(gh issue view "$1" -R "$REPO" --json labels --jq '[.labels[].name] | join(",")')
-           title=$(gh issue view "$1" -R "$REPO" --json title --jq .title)
-           stage=$(due "$1" "$labels")
-           [ -n "$stage" ] && run_stage "$1" "$title" "$stage" || say "#$1 has nothing due [$labels]" ;;
-  *)       sed -n '2,24p' "$0"; exit 2 ;;
+  "")        say "watching $REPO every ${INTERVAL}s (ctrl-c stops the loop; sessions already running finish on their own)"
+             while true; do pass; sleep "$INTERVAL"; done ;;
+  --once)    pass; wait ;;
+  --status)  status ;;
+  [0-9]*)    reap
+             read -r stage prompt <<<"$(due "$1" "$(labels_of "$1")")"
+             if [ -n "${prompt:-}" ]; then
+               run_stage "$1" "$(gh issue view "$1" -R "$REPO" --json title --jq .title)" "$stage" "$prompt"; wait
+             else say "#$1 has nothing due [${stage:-no stage}]"; fi ;;
+  *)         sed -n '2,34p' "$0"; exit 2 ;;
 esac

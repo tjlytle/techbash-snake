@@ -60,9 +60,13 @@ foreground). Stages are labels; the loop decides nothing:
 | `stage:done` | | ready to merge, or merged | |
 | `stage:parked` | | one question for a human, `@tjlytle` in it; the loop resumes when the newest comment is from a human | `stage:in-progress` |
 
-An issue that comes back to the builder a third time parks instead of looping. Logs are in
-`var/pipeline/`. Headless sessions run with the allow list in `bin/pipeline`; a denied tool
-call shows in the log as the reason a stage stopped.
+`working` is the loop's own label: on while a session has the issue, off when it ends. The
+loop tracks its sessions; one that ends without moving the stage label counts as a failure,
+the issue stays where it was and is retried, and after three such endings it parks with the
+log tail and `@tjlytle`. An issue that comes back to the builder a third time parks instead
+of looping. Logs are in `var/pipeline/`, `bin/pipeline --status` shows what is running.
+Headless sessions run with the allow list in `bin/pipeline`; a denied tool call shows in the
+log as the reason a stage stopped.
 
 ## GitHub Workflow
 
