@@ -6,7 +6,7 @@ declare(strict_types=1);
 /**
  * bin/games — read the snake's event-sourced game history.
  *
- *   games list [limit]                 recent games, newest first, with their stats
+ *   games list [limit] [since]         recent games, newest first, with their stats; since = ISO date/time
  *   games game <id>                    one game: ruleset, opponents, how it ended, turns worth a look
  *   games turn <id> <n>                one turn as the board the specs draw, our move, what it led to
  *   games last <id> [count]            the final turns of a game, oldest first
@@ -275,8 +275,12 @@ try {
         case 'list':
             $stats = $games->stats();
             echo "id        when                 turns  win  len  survived  opponents\n";
+            $since = $argv[3] ?? '';
             foreach ($games->ids((int) ($argv[2] ?? 20)) as $id) {
                 $turns = $games->turns($id);
+                if ($since !== '' && $turns !== [] && \strcmp(\substr($turns[0]->recorded, 0, 19), \str_replace('T', ' ', $since)) < 0) {
+                    continue;
+                }
                 $s = $stats[$id] ?? null;
                 \printf(
                     "%s  %s  %5d  %-3s  %3s  %8s  %s\n",
