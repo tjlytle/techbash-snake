@@ -1,0 +1,26 @@
+{
+  "plansDirectory": "./.claude/plans",
+  "enabledPlugins": {
+    "dev-flow@dev-flow": true
+  },
+  "extraKnownMarketplaces": {
+    "dev-flow": {
+      "source": {
+        "source": "github",
+        "repo": "tjlytle/dev-flow"
+      }
+    }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(make test *)",
+      "Bash(make behat *)",
+      "Bash(make build *)",
+      "Bash(make install *)",
+      "Bash(make composer *)",
+      "Bash(docker compose *)",
+      "Bash(gh-as *)",
+      "Bash(gh-personas *)"
+    ]
+  }
+}

@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# bin/pipeline — the agent pipeline for the talk.
+#
+#   bin/pipeline            watch open issues forever; shepherd each one that needs a move
+#   bin/pipeline --once     one pass over the open issues, then exit
+#   bin/pipeline <#>        shepherd one issue now (foreground)
+#
+# Each issue runs `/shepherd <#>` in its own headless Claude Code session (the dev-flow
+# plugin), which reads the issue's trail on GitHub, fires the next moment (/design,
+# /implement, /review, /fix, /ship) and stops at a gate or parks with a question.
+# The gates are in CLAUDE.md under "## GitHub Workflow"; this script decides nothing.
+#
+# The headless session gets the tool allow list below and nothing more: file edits are
+# accepted, and only the listed commands run. A command outside the list is denied and
+# the moment stops with that denial in the log, which is the signal to widen the list.
+#
+# An issue is picked up when it is open, has no shepherd running, and either is not
+# parked or has been answered since it parked (its last comment is from a human).
+# Logs: var/pipeline/<#>.log ; a run marker: var/pipeline/running-<#>/
+set -u
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+REPO=${PIPELINE_REPO:-tjlytle/techbash-snake}
+INTERVAL=${PIPELINE_INTERVAL:-45}
+MODEL=${PIPELINE_MODEL:-opus}
+LOG="$ROOT/var/pipeline"
+mkdir -p "$LOG"
+
+ALLOW=(
+  "Read" "Edit" "Write" "MultiEdit" "Glob" "Grep" "Agent" "Skill" "TodoWrite"
+  "Bash(gh-as *)" "Bash(gh-personas *)" "Bash(gh *)" "Bash(git *)"
+  "Bash(make *)" "Bash(docker compose *)" "Bash(*dev-flow-lock *)"
+  "Bash(ls *)" "Bash(cat *)" "Bash(head *)" "Bash(tail *)" "Bash(sed *)" "Bash(grep *)"
+  "Bash(find *)" "Bash(wc *)" "Bash(jq *)" "Bash(diff *)" "Bash(mkdir *)" "Bash(cd *)"
+  "Bash(pwd)" "Bash(echo *)" "Bash(date *)" "Bash(test *)" "Bash(true)" "Bash(sleep *)"
+)
+
+say() { printf '%s %s\n' "$(date +%H:%M:%S)" "$*"; }
+
+shepherd() {   # shepherd <#> <title>  — foreground, logs to var/pipeline/<#>.log
+  local n=$1 title=$2 mark="$LOG/running-$1"
+  mkdir "$mark" 2>/dev/null || { say "#$n already running"; return 0; }
+  say "#$n  $title  → shepherd ($MODEL)" | tee -a "$LOG/$n.log"
+  ( cd "$ROOT" && claude -p "/shepherd $n" --model "$MODEL" \
+      --permission-mode acceptEdits --allowedTools "${ALLOW[@]}" \
+      --output-format text 2>&1 | sed -u "s/^/  #$n │ /" | tee -a "$LOG/$n.log" )
+  say "#$n  shepherd finished" | tee -a "$LOG/$n.log"
+  rmdir "$mark"
+}
+
+needs_move() {   # needs_move <#> <labels-csv>: parked issues wait for a human comment
+  local n=$1 labels=$2
+  case ",$labels," in
+    *,status:done,*) return 1 ;;
+    *,status:parked,*)
+      local last
+      last=$(gh api "repos/$REPO/issues/$n/comments" --jq 'if length == 0 then "" else (last.user.login + " " + last.user.type) end' 2>/dev/null)
+      [[ "$last" == *" User" ]] || return 1 ;;
+  esac
+  return 0
+}
+
+pass() {   # one sweep over the open issues
+  local any=0
+  while IFS=$'\t' read -r n title labels; do
+    [ -z "$n" ] && continue
+    if [ -d "$LOG/running-$n" ]; then say "#$n  $title  (running)"; continue; fi
+    if needs_move "$n" "$labels"; then
+      any=1; shepherd "$n" "$title" &
+    else
+      say "#$n  $title  [$labels]  waiting"
+    fi
+  done < <(gh issue list -R "$REPO" --state open --limit 50 \
+             --json number,title,labels \
+             --jq '.[] | [.number, .title, ([.labels[].name] | join(","))] | @tsv')
+  wait
+  return $any
+}
+
+case "${1:-}" in
+  "")      say "watching $REPO every ${INTERVAL}s (ctrl-c to stop)"
+           while true; do pass; sleep "$INTERVAL"; done ;;
+  --once)  pass ;;
+  [0-9]*)  title=$(gh issue view "$1" -R "$REPO" --json title --jq .title)
+           shepherd "$1" "$title" ;;
+  *)       sed -n '2,20p' "$0"; exit 2 ;;
+esac
