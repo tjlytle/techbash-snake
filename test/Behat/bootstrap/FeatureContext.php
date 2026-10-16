@@ -73,11 +73,27 @@ final class FeatureContext implements Context
     {
         $body = (string) $this->response?->getBody();
         $data = \json_decode($body, true);
-        Assert::assertIsArray($data);
-        Assert::assertArrayHasKey('move', $data);
+        if (! \is_array($data) || ! isset($data['move'])) {
+            throw new \RuntimeException(\sprintf(
+                'No move in the response (status %d): %s',
+                $this->response?->getStatusCode() ?? 0,
+                $body,
+            ));
+        }
         $expected = Direction::tryFrom(\strtolower($direction));
-        Assert::assertNotNull($expected, "Unknown direction: $direction");
-        Assert::assertSame($expected->value, $data['move']);
+        if ($expected === null) {
+            throw new \InvalidArgumentException("Unknown direction: $direction");
+        }
+        // Plain exception: PHPUnit's assertion failures cannot render outside a PHPUnit run.
+        if ($data['move'] !== $expected->value) {
+            throw new \RuntimeException(\sprintf(
+                'Expected the snake to move %s, it moved %s (response %d: %s)',
+                $expected->value,
+                $data['move'],
+                $this->response?->getStatusCode() ?? 0,
+                $body,
+            ));
+        }
     }
 
     /**

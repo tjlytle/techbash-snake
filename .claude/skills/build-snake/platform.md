@@ -50,9 +50,14 @@ Behat scenarios draw the board as text (`test/Behat/features/moves.feature`), 11
 legend before writing a new board. Conventions seen in the existing feature:
 
 - `-` empty square
-- `0` food
-- `S` our head, `s` our body, `T`/`t` tails (upper case = ours)
-- `U`/`V` and lower-case letters: other snakes' heads and bodies
+- `0` food, `/` hazard
+- a snake is three letters in sequence: head upper case, body the *next* letter lower case,
+  tail that letter upper case. Ours is `S` head, `t` body, `T` tail; the next snake is `U`,
+  `v`, `V`; then `W`, `x`, `X`. A head letter with its own lower case beside it (`Uuuu`) is
+  not a snake at all: the parser silently drops it.
+- the body must be a chain of adjacent squares from head to tail, or the parser throws.
+- top row is the highest `y`, as the board site and `bin/games` draw it; `up` is up.
+- a `/move` before a `/start` is a 409: scenarios send `/start` first.
 
 A scenario:
 
