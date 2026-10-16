@@ -45,6 +45,7 @@ $snakes = @{
 
 # Snakes from the room, added as Tim approves them on the channel (name = URL, one per line).
 $room = [ordered]@{
+    "grok-bot" = "https://sweet-rice-learn.loca.lt"
 }
 
 $pairings = @{
