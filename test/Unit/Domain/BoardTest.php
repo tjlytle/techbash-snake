@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace BattleSnake\Tests\Unit\Domain;
 
+use BattleSnake\Domain\Battlesnake;
 use BattleSnake\Domain\Board;
 use BattleSnake\Domain\Coordinate;
 use BattleSnake\Domain\Direction;
@@ -189,5 +190,47 @@ final class BoardTest extends TestCase
                 "Cell {$direction->value} of our own head should not be threatened by us",
             );
         }
+    }
+
+    #[Test]
+    public function is_threatened_for_ignores_a_strictly_shorter_head(): void
+    {
+        // We are length 3, U is length 2.
+        $state = $this->parse(<<<BOARD
+            --S--
+            --t--
+            --T--
+            -----
+            UV---
+            BOARD);
+
+        $opponent = $this->opponent($state);
+        self::assertFalse($state->board->isThreatenedFor($opponent->head->adjacent(Direction::UP), $state->you));
+    }
+
+    #[Test]
+    public function is_threatened_for_keeps_an_equal_length_head(): void
+    {
+        // We are length 3, U is length 3: a head-to-head kills both.
+        $state = $this->parse(<<<BOARD
+            --S--
+            --t--
+            --T--
+            -----
+            UvV--
+            BOARD);
+
+        $opponent = $this->opponent($state);
+        self::assertTrue($state->board->isThreatenedFor($opponent->head->adjacent(Direction::UP), $state->you));
+    }
+
+    private function opponent(GameState $state): Battlesnake
+    {
+        foreach ($state->board->snakes as $snake) {
+            if ($snake->id !== $state->you->id) {
+                return $snake;
+            }
+        }
+        self::fail('Test fixture must have a second snake');
     }
 }

@@ -69,12 +69,16 @@ final readonly class Board
     /**
      * True if any snake other than $exclude has a head that could move into
      * this position on its next turn (i.e. the position is adjacent to that
-     * snake's head).
+     * snake's head). A strictly shorter snake does not threaten: a
+     * head-to-head is only lost to a snake at least as long as $exclude.
      */
     public function isThreatenedFor(Coordinate $position, Battlesnake $exclude): bool
     {
         foreach ($this->snakes as $snake) {
             if ($snake->id === $exclude->id) {
+                continue;
+            }
+            if ($snake->length < $exclude->length) {
                 continue;
             }
             if ($snake->couldReach($position)) {

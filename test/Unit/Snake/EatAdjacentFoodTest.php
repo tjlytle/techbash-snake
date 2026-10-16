@@ -82,6 +82,7 @@ final class EatAdjacentFoodTest extends TestCase
     #[Test]
     public function leaves_food_an_enemy_head_can_also_reach(): void
     {
+        // The enemy is as long as us: a shorter one would not make the food DANGER.
         $board = <<<'BOARD'
         -----------
         -----------
@@ -90,8 +91,8 @@ final class EatAdjacentFoodTest extends TestCase
         -----------
         U0S--------
         v-t--------
-        V-t--------
-        --T--------
+        v-t--------
+        V-T--------
         -----------
         -----------
         BOARD;
