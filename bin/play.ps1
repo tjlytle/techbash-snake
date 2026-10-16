@@ -10,13 +10,23 @@
 #
 # Needs the rules CLI (battlesnake.exe) on PATH: https://github.com/BattlesnakeOfficial/rules/releases
 # Every snake here is public through the lytlelabs.com tunnel, so this runs from anywhere.
+#
+# The board always opens in ONE dedicated browser window (its own Chrome or Edge profile under
+# %LOCALAPPDATA%\snake-board): park that window on its own desktop and every game lands there as a
+# new tab. The rules CLI opens URLs through rundll32, so a stand-in rundll32.cmd is put first on
+# PATH for the duration of the game. -Browser edge|chrome picks which; -NoWindow uses the default browser.
+#
+# If PowerShell refuses to run scripts:  powershell -ExecutionPolicy Bypass -File .\play.ps1 easy
+# or once:  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 param(
     [ValidateSet("solo", "easy", "mid", "hard", "all")] [string] $Pairing = "solo",
     [int] $Delay = 250,
     [int] $Timeout = 1000,
     [string[]] $Name = @(),
     [string[]] $Url = @(),
-    [switch] $NoBrowser
+    [switch] $NoBrowser,
+    [switch] $NoWindow,
+    [ValidateSet("chrome", "edge")] [string] $Browser = ""
 )
 
 $us = @{ name = "techbash"; url = "https://snake.lytlelabs.com" }
@@ -46,5 +56,23 @@ for ($i = 0; $i -lt $Name.Count; $i++) {
 }
 if (-not $NoBrowser) { $args_ += "--browser" }
 
+$oldPath = $env:PATH
+if (-not $NoBrowser -and -not $NoWindow) {
+    $chrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+    $edge   = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+    $exe = if ($Browser -eq "chrome") { $chrome } elseif ($Browser -eq "edge") { $edge } else { if ($chrome) { $chrome } else { $edge } }
+    if ($exe) {
+        $home_ = Join-Path $env:LOCALAPPDATA "snake-board"
+        $bin = Join-Path $home_ "bin"; $profile_ = Join-Path $home_ "profile"
+        New-Item -ItemType Directory -Force -Path $bin, $profile_ | Out-Null
+        # rundll32 url.dll,FileProtocolHandler <url>  →  open <url> in the dedicated profile window
+        "@echo off`r`nstart `"`" `"$exe`" --user-data-dir=`"$profile_`" --no-first-run `"%~2`"`r`n" | Set-Content -Path (Join-Path $bin "rundll32.cmd") -Encoding ASCII
+        $env:PATH = "$bin;$env:PATH"
+        Write-Host "board window: $(Split-Path $exe -Leaf) profile in $profile_" -ForegroundColor DarkGray
+    } else {
+        Write-Host "no Chrome or Edge found; using the default browser" -ForegroundColor Yellow
+    }
+}
+
 Write-Host "battlesnake $($args_ -join ' ')" -ForegroundColor DarkGray
-& battlesnake @args_
+try { & battlesnake @args_ } finally { $env:PATH = $oldPath }
