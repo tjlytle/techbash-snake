@@ -114,7 +114,7 @@ and a person moves one to `stage:in-progress`.
 
 Merge: human
 Promote ideas: no
-Plans: human
+Plans: auto
 
 `Merge: auto` would let the QA stage merge a green PR as builder and pull this checkout.
 `Plans: auto` would let the architect move a planned issue straight to `stage:in-progress`.
