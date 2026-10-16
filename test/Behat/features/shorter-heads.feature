@@ -1,20 +1,21 @@
 Feature: A square only shorter heads can reach is not danger
-  In order to keep the ring instead of flinching from snakes I would beat head-to-head
+  In order to take squares I would win head-to-head instead of flinching from them
   As the TechBash snake
   I treat a square as dangerous only when a head as long as me or longer can reach it
+  These boards leave one SAFE square, so the move proves the rule whatever strategy is playing
 
-  Scenario: A shorter head next to the ring square ahead
+  Scenario: Only a shorter head reaches the way out
     Given the board is:
       """
       -----------
       -----------
       -----------
       -----------
-      ---UvV-----
-      --S--------
-      --t--------
-      --t--------
-      --T--------
+      -UvV-------
+      S-WxxX-----
+      t----------
+      t----------
+      T----------
       -----------
       -----------
       """
@@ -44,15 +45,15 @@ Feature: A square only shorter heads can reach is not danger
   Scenario: One head as long as us keeps the square ahead dangerous
     Given the board is:
       """
-      --X--------
-      --x--------
-      --x--------
-      --W--------
-      ---UvV-----
-      --S--------
-      --t--------
-      --t--------
-      --T--------
+      X----------
+      x----------
+      x----------
+      W----------
+      -UvV-------
+      S----------
+      t----------
+      t----------
+      T----------
       -----------
       -----------
       """

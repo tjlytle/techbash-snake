@@ -38,7 +38,7 @@ class MoveClassifier
                 $classifications[] = Classification::DANGER;
             }
 
-            if (! $board->contains($position) || $board->hasSnakeAt($position)) {
+            if (! $board->contains($position) || $board->hasBlockingSnakeAt($position)) {
                 $classifications = [Classification::END];
             }
 

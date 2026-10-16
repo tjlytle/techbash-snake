@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace BattleSnake\Tests\Unit\Domain;
 
 use BattleSnake\Domain\Battlesnake;
+use BattleSnake\Domain\Board;
 use BattleSnake\Domain\Coordinate;
 use BattleSnake\Domain\Direction;
 use BattleSnake\Domain\GameState;
@@ -92,6 +93,46 @@ final class BoardTest extends TestCase
         }
         // (0,0) is empty.
         self::assertFalse($board->hasSnakeAt(new Coordinate(0, 0)));
+    }
+
+    /** @param list<array{x: int, y: int}> $extraTail */
+    private function boardWithTail(array $extraTail = []): Board
+    {
+        $request = (new SnekSpecParser())->parse(<<<BOARD
+            -----
+            --T--
+            --t--
+            --S--
+            -----
+            BOARD);
+        foreach ($extraTail as $segment) {
+            $request['board']['snakes'][0]['body'][] = $segment;
+        }
+        return GameStateParserFactory::make()->parse($request)->board;
+    }
+
+    #[Test]
+    public function has_blocking_snake_at_skips_a_tail_that_will_move(): void
+    {
+        self::assertFalse($this->boardWithTail()->hasBlockingSnakeAt(new Coordinate(2, 3)));
+    }
+
+    #[Test]
+    public function has_blocking_snake_at_keeps_a_stacked_tail(): void
+    {
+        $board = $this->boardWithTail([['x' => 2, 'y' => 3]]);
+
+        self::assertTrue($board->hasBlockingSnakeAt(new Coordinate(2, 3)));
+    }
+
+    #[Test]
+    public function has_blocking_snake_at_keeps_body_segments(): void
+    {
+        $board = $this->boardWithTail();
+
+        self::assertTrue($board->hasBlockingSnakeAt(new Coordinate(2, 1)));
+        self::assertTrue($board->hasBlockingSnakeAt(new Coordinate(2, 2)));
+        self::assertFalse($board->hasBlockingSnakeAt(new Coordinate(0, 0)));
     }
 
     #[Test]

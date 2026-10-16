@@ -118,10 +118,11 @@ final class CutOffSpaceTest extends TestCase
         T----------
         t----------
         t----------
-        S-UV-------
+        S-UvvV-----
         BOARD;
 
-        // Up is our neck, right is next to their head, left and down are off the board.
+        // Up is our neck, right is next to the head of a snake as long as us (a
+        // shorter head would not make it DANGER), left and down are off the board.
         $this->assertAbstains(self::state($board));
     }
 }

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace BattleSnake\Tests\Unit\Domain;
 
+use BattleSnake\Domain\Battlesnake;
+use BattleSnake\Domain\Coordinate;
+use BattleSnake\Domain\CoordinateCollection;
 use BattleSnake\Domain\Direction;
 use BattleSnake\Domain\GameState;
 use BattleSnake\Domain\Parser\GameStateParserFactory;
@@ -91,5 +94,58 @@ final class BattlesnakeTest extends TestCase
 
         self::assertFalse($state->you->couldReach($two_up));
         self::assertFalse($state->you->couldReach($head));
+    }
+
+    private static function snake(Coordinate ...$body): Battlesnake
+    {
+        return new Battlesnake(
+            id: 'snake',
+            name: 'snake',
+            health: 90,
+            body: new CoordinateCollection(...$body),
+            head: $body[0] ?? null,
+            length: \count($body),
+        );
+    }
+
+    #[Test]
+    public function just_ate_is_true_when_the_tail_is_stacked(): void
+    {
+        $snake = self::snake(new Coordinate(2, 3), new Coordinate(2, 2), new Coordinate(2, 1), new Coordinate(2, 1));
+
+        self::assertTrue($snake->justAte());
+    }
+
+    #[Test]
+    public function just_ate_is_false_for_a_plain_body(): void
+    {
+        $snake = self::snake(new Coordinate(2, 3), new Coordinate(2, 2), new Coordinate(2, 1));
+
+        self::assertFalse($snake->justAte());
+    }
+
+    #[Test]
+    public function just_ate_is_false_for_a_single_segment(): void
+    {
+        self::assertFalse(self::snake(new Coordinate(2, 3))->justAte());
+    }
+
+    #[Test]
+    public function blocks_every_segment_but_a_tail_that_will_move(): void
+    {
+        $snake = self::snake(new Coordinate(2, 3), new Coordinate(2, 2), new Coordinate(2, 1));
+
+        self::assertTrue($snake->blocks(new Coordinate(2, 3)));
+        self::assertTrue($snake->blocks(new Coordinate(2, 2)));
+        self::assertFalse($snake->blocks(new Coordinate(2, 1)));
+        self::assertFalse($snake->blocks(new Coordinate(0, 0)));
+    }
+
+    #[Test]
+    public function blocks_the_tail_when_the_snake_just_ate(): void
+    {
+        $snake = self::snake(new Coordinate(2, 3), new Coordinate(2, 2), new Coordinate(2, 1), new Coordinate(2, 1));
+
+        self::assertTrue($snake->blocks(new Coordinate(2, 1)));
     }
 }

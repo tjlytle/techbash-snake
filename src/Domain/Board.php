@@ -55,6 +55,17 @@ final readonly class Board
         return false;
     }
 
+    /** True if any snake will still be on this position next turn (a tail that will move is free). */
+    public function hasBlockingSnakeAt(Coordinate $position): bool
+    {
+        foreach ($this->snakes as $snake) {
+            if ($snake->blocks($position)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * True if any snake other than $exclude has a head that could move into
      * this position on its next turn (i.e. the position is adjacent to that
