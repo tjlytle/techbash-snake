@@ -15,6 +15,7 @@ use League\OpenAPIValidation\PSR7\ValidatorBuilder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
@@ -44,7 +45,13 @@ final class ApiSpecTest extends TestCase
     {
         $request = new ServerRequest([], [], 'http://localhost/', 'GET');
 
-        $this->assertCompliant($request);
+        $response = $this->assertCompliant($request);
+
+        $info = \json_decode((string) $response->getBody(), true);
+        self::assertSame('tjlytle', $info['author']);
+        self::assertSame('#0e8a16', $info['color']);
+        self::assertSame('evil', $info['head']);
+        self::assertSame('bolt', $info['tail']);
     }
 
     /**
@@ -86,7 +93,7 @@ final class ApiSpecTest extends TestCase
         }
     }
 
-    private function assertCompliant(ServerRequestInterface $request): void
+    private function assertCompliant(ServerRequestInterface $request): ResponseInterface
     {
         $address = self::$requests->validate($request);
         $response = self::$app->handle($request);
@@ -97,5 +104,7 @@ final class ApiSpecTest extends TestCase
             $response,
         );
         $this->addToAssertionCount(2);
+
+        return $response;
     }
 }
