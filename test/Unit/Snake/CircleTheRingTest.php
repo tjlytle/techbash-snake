@@ -275,14 +275,15 @@ final class CircleTheRingTest extends TestCase
     {
         // Ahead and inward are both dead; this strategy has no third opinion.
         // It votes the ring anyway and lets the composition's safety net win.
+        // Inward is W's body, not its tail: a tail moves off and is free.
         $board = <<<'BOARD'
         -----------
         -----------
         -----------
         -----------
         -VvvvU-----
-        --SXxW-----
-        --t--------
+        --SxX------
+        --tW-------
         --t--------
         --T--------
         -----------
