@@ -5,6 +5,8 @@
 #   .\play.ps1 mid                  vs snork and hobbs
 #   .\play.ps1 hard                 vs shapeshifter, snork and hobbs
 #   .\play.ps1 all                  everyone on the board (7 snakes)
+#   .\play.ps1 room                 vs the snakes the room submitted and Tim approved (filled in during the talk)
+#   .\play.ps1 room-hard            the room plus shapeshifter and snork
 #   .\play.ps1 hard -Delay 400      slower turns for the room (ms per turn, default 250)
 #   .\play.ps1 -Name you -Url https://their-snake.example   add any snake by name and URL
 #
@@ -19,7 +21,7 @@
 # Easiest: play.cmd next to this file runs it with the execution policy bypassed:  .\play easy -Delay 400
 # Or once:  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned, then .\play.ps1 works directly.
 param(
-    [ValidateSet("solo", "easy", "mid", "hard", "all")] [string] $Pairing = "solo",
+    [ValidateSet("solo", "easy", "mid", "hard", "all", "room", "room-hard")] [string] $Pairing = "solo",
     [int] $Delay = 250,
     [int] $Timeout = 1000,
     [string[]] $Name = @(),
@@ -41,13 +43,21 @@ $snakes = @{
     shapeshifter = "https://shapeshifter.lytlelabs.com"            # JonathanArns (elite 2022)
 }
 
+# Snakes from the room, added as Tim approves them on the channel (name = URL, one per line).
+$room = [ordered]@{
+}
+
 $pairings = @{
     solo = @()
     easy = @("random", "starter-py", "starter-js")
     mid  = @("snork", "hobbs")
     hard = @("shapeshifter", "snork", "hobbs")
     all  = @("random", "starter-py", "starter-js", "snork", "hobbs", "devin", "shapeshifter")
+    room = @()
+    "room-hard" = @("shapeshifter", "snork")
 }
+foreach ($k in $room.Keys) { $snakes[$k] = $room[$k] }
+if ($Pairing -like "room*") { $pairings[$Pairing] = @($room.Keys) + $pairings[$Pairing] }
 
 $args_ = @("play", "-W", "11", "-H", "11", "-t", "$Timeout", "-d", "$Delay", "--name", $us.name, "--url", $us.url)
 foreach ($n in $pairings[$Pairing]) { $args_ += @("--name", $n, "--url", $snakes[$n]) }
