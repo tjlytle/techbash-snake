@@ -78,3 +78,22 @@ Feature: The snake grows until it is the longest, then uses its body to trap
     When the snake receives a "/start" request
     And the snake receives a "/move" request
     Then the snake moves "left"
+
+  Scenario: Growing, the snake will not hunt into a pocket smaller than itself
+    Given the board is:
+      """
+      ---------S-
+      -------tttt
+      ------ttttt
+      ------t-ttt
+      ------t-ttt
+      ------ttttt
+      ----------t
+      ----------T
+      -----------
+      -----------
+      ----------0
+      """
+    When the snake receives a "/start" request
+    And the snake receives a "/move" request
+    Then the snake moves "left"

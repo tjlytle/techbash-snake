@@ -11,6 +11,7 @@ declare(strict_types=1);
 use BattleSnake\Analyzer\MoveClassifier;
 use BattleSnake\Domain\GameState;
 use BattleSnake\EventSourcing\Game;
+use BattleSnake\Snake\AvoidDeadEnds;
 use BattleSnake\Snake\CircleTheRing;
 use BattleSnake\Snake\CutOffSpace;
 use BattleSnake\Snake\EatAdjacentFood;
@@ -28,7 +29,12 @@ return [
 
     // POST /manual can nudge any move; otherwise the composition below plays.
     Nudgeable::class => DI\autowire()
-        ->constructorParameter('fallback', DI\get(Conditional::class)),
+        ->constructorParameter('fallback', DI\get(AvoidDeadEnds::class)),
+
+    // AvoidDeadEnds: whichever phase plays, a move into a pocket smaller than our length
+    // is swapped for the SAFE move with the most room (QA's solo game 7ebdae57, turn 163).
+    AvoidDeadEnds::class => DI\autowire()
+        ->constructorParameter('inner', DI\get(Conditional::class)),
 
     // Conditional: grow until we are strictly longer than every other snake, then trap.
     // Equal length is not big (a head-to-head kills both); a solo game always grows.
