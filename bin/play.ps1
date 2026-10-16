@@ -5,7 +5,7 @@
 #   .\play.ps1 mid                  vs snork and hobbs
 #   .\play.ps1 hard                 vs shapeshifter, snork and hobbs
 #   .\play.ps1 all                  everyone on the board (7 snakes)
-#   .\play.ps1 room                 vs the snakes the room submitted and Tim approved (filled in during the talk)
+#   .\play.ps1 room                 vs up to 3 of the snakes the room submitted, picked at random (-RoomMax 5 for more)
 #   .\play.ps1 room-hard            the room plus shapeshifter and snork
 #   .\play.ps1 hard -Delay 400      slower turns for the room (ms per turn, default 250)
 #   .\play.ps1 -Name you -Url https://their-snake.example   add any snake by name and URL
@@ -24,6 +24,7 @@ param(
     [ValidateSet("solo", "easy", "mid", "hard", "all", "room", "room-hard")] [string] $Pairing = "solo",
     [int] $Delay = 250,
     [int] $Timeout = 1000,
+    [int] $RoomMax = 3,
     [string[]] $Name = @(),
     [string[]] $Url = @(),
     [switch] $NoBrowser,
@@ -57,7 +58,12 @@ $pairings = @{
     "room-hard" = @("shapeshifter", "snork")
 }
 foreach ($k in $room.Keys) { $snakes[$k] = $room[$k] }
-if ($Pairing -like "room*") { $pairings[$Pairing] = @($room.Keys) + $pairings[$Pairing] }
+# A room game takes at most 3 of the submitted snakes, picked at random each time (-RoomMax changes it).
+if ($Pairing -like "room*") {
+    $picked = @($room.Keys)
+    if ($picked.Count -gt $RoomMax) { $picked = @($picked | Get-Random -Count $RoomMax) }
+    $pairings[$Pairing] = $picked + $pairings[$Pairing]
+}
 
 $args_ = @("play", "-W", "11", "-H", "11", "-t", "$Timeout", "-d", "$Delay", "--name", $us.name, "--url", $us.url)
 foreach ($n in $pairings[$Pairing]) { $args_ += @("--name", $n, "--url", $snakes[$n]) }
