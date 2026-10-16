@@ -3,6 +3,9 @@ Feature: The snake circles a ring a quarter of the board in from the walls
   As the TechBash snake
   I follow a clockwise ring, eat food next to my head, and cut inward when the ring is blocked
 
+  # CutOffSpace replaced CircleTheRing in the composition (issue #10). The @unwired scenarios
+  # describe the ring alone and are filtered out in behat.yml; the first one still holds.
+
   Scenario: Food next to the head beats the ring
     Given the board is:
       """
@@ -22,6 +25,7 @@ Feature: The snake circles a ring a quarter of the board in from the walls
     And the snake receives a "/move" request
     Then the snake moves "left"
 
+  @unwired
   Scenario: Food across the board is ignored, the snake keeps circling
     Given the board is:
       """
@@ -41,6 +45,7 @@ Feature: The snake circles a ring a quarter of the board in from the walls
     And the snake receives a "/move" request
     Then the snake moves "up"
 
+  @unwired
   Scenario: A snake across the ring makes us cut inward
     Given the board is:
       """
@@ -60,6 +65,7 @@ Feature: The snake circles a ring a quarter of the board in from the walls
     And the snake receives a "/move" request
     Then the snake moves "right"
 
+  @unwired
   Scenario: Off the ring, the snake heads for it
     Given the board is:
       """

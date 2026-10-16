@@ -9,5 +9,8 @@ default:
     default:
       paths:
         - "%paths.base%/test/Behat/features"
+      # Scenarios for strategies no longer in the composition.
+      filters:
+        tags: "~@unwired"
       contexts:
         - BattleSnake\Tests\Behat\FeatureContext
