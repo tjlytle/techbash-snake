@@ -73,11 +73,22 @@ final class FeatureContext implements Context
     {
         $body = (string) $this->response?->getBody();
         $data = \json_decode($body, true);
-        Assert::assertIsArray($data);
-        Assert::assertArrayHasKey('move', $data);
+        if (! \is_array($data) || ! isset($data['move'])) {
+            throw new \RuntimeException(\sprintf(
+                'No move in the response (status %s): %s',
+                $this->response?->getStatusCode() ?? 'none',
+                $body === '' ? '<empty body>' : $body,
+            ));
+        }
         $expected = Direction::tryFrom(\strtolower($direction));
-        Assert::assertNotNull($expected, "Unknown direction: $direction");
-        Assert::assertSame($expected->value, $data['move']);
+        if ($expected === null) {
+            throw new \RuntimeException("Unknown direction: $direction");
+        }
+        // A plain exception, not a PHPUnit assertion: PHPUnit's failure exporter needs its
+        // own runtime configuration, which does not exist under Behat.
+        if ($expected->value !== $data['move']) {
+            throw new \RuntimeException(\sprintf('Expected the snake to move %s, it moved %s', $expected->value, $data['move']));
+        }
     }
 
     /**
