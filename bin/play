@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# bin/play — play one game against the running snake, so there is something to analyse.
+#
+#   bin/play                          a solo game, 11x11, against our snake
+#   bin/play <name> <url> [...]       add opponents by name and URL (pairs; see pipeline/opponents.md)
+#   bin/play --browser ...            also open the board in a browser (presenting machine only)
+#   bin/play --snake URL ...          play against a snake served elsewhere (a branch on another port)
+#
+# Uses the official rules CLI (`battlesnake`). SNAKE_URL is our snake (default
+# http://localhost:8088; the overnight checkout sets its own). Prints the result line and the
+# game id, which is what `make games ARGS="game <id>"` wants next. Log: var/pipeline/play.log
+set -u
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+[ -f "$ROOT/.env" ] && . "$ROOT/.env"          # PORT=…, the same file docker compose reads
+SNAKE_URL=${SNAKE_URL:-http://localhost:${PORT:-8088}}
+LOG="$ROOT/var/pipeline"
+mkdir -p "$LOG"
+
+args=(play -W 11 -H 11 --name techbash --url "$SNAKE_URL" -t 1000 -d 0)
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --browser) args+=(--browser); shift ;;
+    --snake)   SNAKE_URL=$2; args[8]=$2; shift 2 ;;
+    *) [ $# -ge 2 ] || { echo "opponents come in pairs: <name> <url>" >&2; exit 2; }
+       args+=(--name "$1" --url "$2"); shift 2 ;;
+  esac
+done
+
+printf '%s play %s\n' "$(date +%H:%M:%S)" "${args[*]}" | tee -a "$LOG/play.log"
+out=$(battlesnake "${args[@]}" 2>&1)
+echo "$out" | grep -iE "game completed|winner|draw|error|warn" | tail -n 4 | tee -a "$LOG/play.log"
+# The rules CLI does not print the game id it sent; the store knows it as the newest game.
+# Read the store of the checkout the game was played from: the current directory when it has a
+# Makefile (a worktree serving a branch), else the script's own checkout.
+STORE=$ROOT; [ -f Makefile ] && [ -f var/snake.db ] && STORE=$PWD
+(cd "$STORE" && make -s games ARGS="list 1" 2>/dev/null | tail -n 1 | awk '{print "newest game: " $1 "  (" $4 " turns, win " $5 ")"}') | tee -a "$LOG/play.log"

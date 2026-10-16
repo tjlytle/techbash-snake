@@ -17,6 +17,31 @@ TechBash 2026 talk "BattleSnake in 50 minutes". The map of the code is
   Behat scenario in `test/Behat/features/`. Do not touch the event-sourcing wiring, Docker,
   Composer or the public API for a snake change.
 
+## Strategies: compose, never replace
+
+The snake that plays is a **composition** of small strategies, not one class that keeps
+growing. This is the design the talk is about, so every change keeps to it:
+
+- A behaviour is its own `Strategy` class under `src/Snake/`, named for what it does
+  (`HuntFoodWhenHungry`, `AvoidDeadEnds`, `DodgeLongerHeads`), one concern each, built on the
+  `MoveClassifier` labels, with its own unit test. A departure in behaviour is a **new** class;
+  an existing strategy is only edited to fix a bug in what it already claims to do.
+- The playing snake is assembled from the platform's combinators: aggregates (`Majority`,
+  `Scored`, `FirstSafe`, `Conditional`) and decorators (`Fallback`, `Nudgeable`). `Conditional`
+  switches strategies by the phase of the game (turn, health, length, snakes left), `Scored`
+  weighs votes, `FirstSafe` orders preferences, `Fallback` catches the rest. Complex behaviour
+  comes from the composition, never from one strategy knowing everything.
+- The composition lives in one place, `src/Core/di/snake.php` (a `TechBashSnake` factory
+  there if it outgrows a few lines), and that is the only wiring that changes when a strategy
+  is added. Say in the PR where the new strategy slots in and why (which condition, which
+  weight, which order).
+- A superseded strategy is left in place and unwired, with a line in the composition saying
+  what replaced it. Nothing is deleted during the talk.
+- An issue that says "the snake should X" is answered by three questions before code: which
+  existing strategy already covers part of X, what new strategy X needs, and where in the
+  composition it goes. The Behat scenario tests the composed snake; the unit test tests the
+  strategy alone.
+
 ## How work gets done here
 
 There are two ways to build something, and the words Tim uses pick one.
@@ -67,6 +92,33 @@ log tail and `@tjlytle`. An issue that comes back to the builder a third time pa
 of looping. Logs are in `var/pipeline/`, `bin/pipeline --status` shows what is running.
 Headless sessions run with the allow list in `bin/pipeline`; a denied tool call shows in the
 log as the reason a stage stopped.
+
+## The analyst
+
+Every game is event-sourced, so the snake's history is on disk. `bin/games` (run as
+`make games ARGS="…"`, inside the PHP container) replays it: `list`, `game <id>`,
+`turn <id> <n>` (the board as the specs draw it, our move, what it led to), `last <id>`,
+`scenario <id> <n> [move]` (a Behat scenario to paste into an issue). `bin/analyze` runs
+`pipeline/analyze.md` as ops: it reads the games since the last run and files one `idea`
+issue per lesson, each carrying the board situation as a scenario, which is exactly what the
+build stage needs as acceptance criteria. A session plays its own games with `bin/play`
+against the snakes in `pipeline/opponents.md`, stops at its deadline, and systemd starts the
+next one. The two lines below are read by the prompts:
+
+Merge: human
+Promote ideas: no
+
+`Merge: auto` lets the QA stage merge a green PR as builder and pull this checkout, so the
+running snake serves the new code. `Promote ideas: yes` lets the analyst move its own best
+lesson to `stage:in-progress` while fewer than two issues are in flight. Both stay off in the
+demo repo; the overnight repo turns them on.
+
+## Keeping it running
+
+`bin/install-services` writes user systemd units named after this directory: the pipeline
+loop and the analyst (both restart on exit) and the two local starter snakes the analyst plays
+against. `loginctl enable-linger` keeps them up after logout; `bin/install-services remove`
+takes them out, `status` shows them.
 
 ## GitHub Workflow
 
