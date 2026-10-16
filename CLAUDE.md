@@ -98,27 +98,16 @@ log as the reason a stage stopped.
 Every game is event-sourced, so the snake's history is on disk. `bin/games` (run as
 `make games ARGS="…"`, inside the PHP container) replays it: `list`, `game <id>`,
 `turn <id> <n>` (the board as the specs draw it, our move, what it led to), `last <id>`,
-`scenario <id> <n> [move]` (a Behat scenario to paste into an issue). `bin/analyze` runs
-`pipeline/analyze.md` as ops: it reads the games since the last run and files one `idea`
-issue per lesson, each carrying the board situation as a scenario, which is exactly what the
-build stage needs as acceptance criteria. A session plays its own games with `bin/play`
-against the snakes in `pipeline/opponents.md`, stops at its deadline, and systemd starts the
-next one. The two lines below are read by the prompts:
+`scenario <id> <n> [move]` (a Behat scenario to paste into an issue). `bin/play` plays a game
+with the rules CLI against the snakes in `pipeline/opponents.md`; `bin/play.ps1` does the same
+from a Windows laptop through the public names. The analyst is a person with Claude in a
+session, not a service: play, read the games, file lessons as `idea` issues with a scenario,
+and a person moves one to `stage:in-progress`.
 
 Merge: human
 Promote ideas: no
 
-`Merge: auto` lets the QA stage merge a green PR as builder and pull this checkout, so the
-running snake serves the new code. `Promote ideas: yes` lets the analyst move its own best
-lesson to `stage:in-progress` while fewer than two issues are in flight. Both stay off in the
-demo repo; the overnight repo turns them on.
-
-## Keeping it running
-
-`bin/install-services` writes user systemd units named after this directory: the pipeline
-loop and the analyst (both restart on exit) and the two local starter snakes the analyst plays
-against. `loginctl enable-linger` keeps them up after logout; `bin/install-services remove`
-takes them out, `status` shows them.
+`Merge: auto` would let the QA stage merge a green PR as builder and pull this checkout.
 
 ## GitHub Workflow
 
