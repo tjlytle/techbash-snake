@@ -1,4 +1,4 @@
-# bin/play.ps1 — play the TechBash snake from a Windows laptop, board in the browser.
+﻿# bin/play.ps1 — play the TechBash snake from a Windows laptop, board in the browser.
 #
 #   .\play.ps1                      our snake alone
 #   .\play.ps1 easy                 vs the basic random snake and the two official starters
@@ -16,8 +16,8 @@
 # new tab. The rules CLI opens URLs through rundll32, so a stand-in rundll32.cmd is put first on
 # PATH for the duration of the game. -Browser edge|chrome picks which; -NoWindow uses the default browser.
 #
-# If PowerShell refuses to run scripts:  powershell -ExecutionPolicy Bypass -File .\play.ps1 easy
-# or once:  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+# Easiest: play.cmd next to this file runs it with the execution policy bypassed:  .\play easy -Delay 400
+# Or once:  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned, then .\play.ps1 works directly.
 param(
     [ValidateSet("solo", "easy", "mid", "hard", "all")] [string] $Pairing = "solo",
     [int] $Delay = 250,
