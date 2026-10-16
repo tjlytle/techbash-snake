@@ -1,10 +1,10 @@
 ﻿# bin/play.ps1 — play the TechBash snake from a Windows laptop, board in the browser.
 #
 #   .\play.ps1                      our snake alone
-#   .\play.ps1 easy                 vs the basic random snake and the two official starters
+#   .\play.ps1 easy                 vs the two official starter snakes
 #   .\play.ps1 mid                  vs snork and hobbs
 #   .\play.ps1 hard                 vs shapeshifter, snork and hobbs
-#   .\play.ps1 all                  everyone on the board (7 snakes)
+#   .\play.ps1 all                  everyone on the board (6 snakes)
 #   .\play.ps1 room                 vs up to 3 of the snakes the room submitted, picked at random (-RoomMax 5 for more)
 #   .\play.ps1 room-hard            the room plus shapeshifter and snork
 #   .\play.ps1 hard -Delay 400      slower turns for the room (ms per turn, default 250)
@@ -35,7 +35,6 @@ param(
 $us = @{ name = "techbash"; url = "https://snake.lytlelabs.com" }
 
 $snakes = @{
-    random       = "https://random.lytlelabs.com"                  # the platform's basic snake
     "starter-py" = "https://starter-py.lytlelabs.com"              # official Python starter
     "starter-js" = "https://starter-js.lytlelabs.com"              # official JavaScript starter
     snork        = "https://snork.lytlelabs.com"                   # wrenger/snork (strong)
@@ -50,10 +49,10 @@ $room = [ordered]@{
 
 $pairings = @{
     solo = @()
-    easy = @("random", "starter-py", "starter-js")
+    easy = @("starter-py", "starter-js")
     mid  = @("snork", "hobbs")
     hard = @("shapeshifter", "snork", "hobbs")
-    all  = @("random", "starter-py", "starter-js", "snork", "hobbs", "devin", "shapeshifter")
+    all  = @("starter-py", "starter-js", "snork", "hobbs", "devin", "shapeshifter")
     room = @()
     "room-hard" = @("shapeshifter", "snork")
 }
