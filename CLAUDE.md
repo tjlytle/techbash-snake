@@ -78,7 +78,8 @@ foreground). Stages are labels; the loop decides nothing:
 
 | Label | Who | Prompt | Leaves as |
 |---|---|---|---|
-| `stage:todo` | nobody | backlog, untouched | moved by a human |
+| `stage:todo` | architect | `pipeline/plan.md`: read the issue and the composition, post an Implementation Plan (behaviour, board situations, shape, tests, risks) | `stage:planned` |
+| `stage:planned` | nobody | the plan is up; a person moves it on when they agree with it | moved by a human to `stage:in-progress` |
 | `stage:in-progress` | builder | `pipeline/build.md`: worktree, failing test, smallest change, suites green, draft PR | `stage:review` |
 | `stage:review` | reviewer | `pipeline/review.md`: read the PR; approve, or send back with the finding; improvements become `idea` issues | `stage:qa` or back to `stage:in-progress` |
 | `stage:qa` | qa | `pipeline/qa.md`: run PHPUnit (with the API-spec test) and Behat; post the results | `stage:done` or back to `stage:in-progress` |
@@ -106,8 +107,10 @@ and a person moves one to `stage:in-progress`.
 
 Merge: human
 Promote ideas: no
+Plans: human
 
 `Merge: auto` would let the QA stage merge a green PR as builder and pull this checkout.
+`Plans: auto` would let the architect move a planned issue straight to `stage:in-progress`.
 
 ## GitHub Workflow
 
